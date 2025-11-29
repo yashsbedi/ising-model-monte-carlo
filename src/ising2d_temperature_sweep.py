@@ -49,8 +49,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--temperature_min",
         type=float,
-        default=0.5,
-        help="Minimum temperature in the sweep (default: 0.5).",
+        default=0.01,
+        help="Minimum temperature in the sweep (default: 0.01).",
     )
     parser.add_argument(
         "--temperature_max",
