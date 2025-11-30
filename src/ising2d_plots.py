@@ -48,29 +48,33 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_sweep_data(input_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def load_sweep_data(input_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load temperature sweep data from a .npz file.
 
     Args:
         input_path (str): Path to the .npz file containing sweep data.
 
     Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray]:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             - Temperatures.
             - Mean magnetisation values.
             - Specific heat values.
+            - Susceptibility values.
     """
     data = np.load(input_path)
     temperatures = data["temperatures"]
     magnetisation_means = data["magnetisation_means"]
     specific_heats = data["specific_heats"]
-    return temperatures, magnetisation_means, specific_heats
+    susceptibilities = data["susceptibilities"]
+    return temperatures, magnetisation_means, specific_heats, susceptibilities
+
 
 
 def make_plots(
     temperatures: np.ndarray,
     magnetisation_means: np.ndarray,
     specific_heats: np.ndarray,
+    susceptibilities: np.ndarray,
     output_directory: str,
 ) -> None:
     """Create and save plots of |M| and C_v as functions of temperature.
@@ -104,19 +108,30 @@ def make_plots(
     plt.savefig(specific_heat_path, dpi=300, bbox_inches="tight")
     plt.close()
 
+    # Plot susceptibility
+    plt.figure()
+    plt.plot(temperatures, susceptibilities, marker="o")
+    plt.xlabel("Temperature T")
+    plt.ylabel("Susceptibility per site chi")
+    plt.title("2D Ising model: susceptibility versus temperature")
+    susceptibility_path = output_dir_path / "ising2d_susceptibility_vs_temperature.png"
+    plt.savefig(susceptibility_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
     print(f"Saved plots to {output_dir_path}")
 
 
 def main() -> None:
     """Entry point for generating plots from 2D Ising sweep data."""
     arguments = parse_arguments()
-    temperatures, magnetisation_means, specific_heats = load_sweep_data(
+    temperatures, magnetisation_means, specific_heats, susceptibilities = load_sweep_data(
         input_path=arguments.input_path
     )
     make_plots(
         temperatures=temperatures,
         magnetisation_means=magnetisation_means,
         specific_heats=specific_heats,
+        susceptibilities=susceptibilities,
         output_directory=arguments.output_directory,
     )
 

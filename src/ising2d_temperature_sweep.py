@@ -2,8 +2,8 @@
 ising2d_temperature_sweep.py
 
 Run a 2D Ising model over a range of temperatures, using the Metropolis
-algorithm, and record magnetisation and specific heat as functions of
-temperature.
+algorithm, and record magnetisation, specific heat, and susceptibility
+as functions of temperature.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Tuple
 import numpy as np
 
 from .ising2d_simulation import run_ising2d_simulation
-from .observables import compute_specific_heat
+from .observables import compute_specific_heat, compute_susceptibility
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -28,7 +28,7 @@ def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run a 2D Ising model over a range of temperatures and compute "
-            "magnetisation and specific heat."
+            "magnetisation, specific heat, and susceptibility."
         )
     )
     parser.add_argument(
@@ -110,8 +110,8 @@ def run_temperature_sweep(
     burn_in_sweeps: int,
     sampling_interval: int,
     random_seed: int | None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Run a temperature sweep and compute magnetisation and specific heat.
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Run a temperature sweep and compute magnetisation, C_v and chi.
 
     Args:
         lattice_size (int): Linear lattice size L.
@@ -125,16 +125,18 @@ def run_temperature_sweep(
         random_seed (int | None): Base seed.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             - Temperatures.
-            - Mean magnetisation per site at each temperature.
-            - Specific heat per site at each temperature.
+            - Mean absolute magnetisation per site.
+            - Specific heat per site.
+            - Susceptibility per site.
     """
     temperatures = np.linspace(
         temperature_min, temperature_max, number_of_temperatures
     )
     magnetisation_means = np.empty(number_of_temperatures, dtype=float)
     specific_heats = np.empty(number_of_temperatures, dtype=float)
+    susceptibilities = np.empty(number_of_temperatures, dtype=float)
 
     number_of_sites = lattice_size * lattice_size
 
@@ -154,22 +156,31 @@ def run_temperature_sweep(
             random_seed=seed_for_this_temperature,
         )
 
+        # Mean absolute magnetisation per site
         magnetisation_means[index] = np.mean(np.abs(magnetisation_samples))
-        specific_heats[index] = (
-            compute_specific_heat(
-                energy_samples=np.array(energy_samples),
-                temperature=temperature,
-            )
-            / number_of_sites
+
+        # Specific heat per site
+        Cv_total = compute_specific_heat(
+            energy_samples=np.array(energy_samples),
+            temperature=temperature,
+        )
+        specific_heats[index] = Cv_total / number_of_sites
+
+        # Susceptibility per site
+        susceptibilities[index] = compute_susceptibility(
+            magnetisation_samples=np.array(magnetisation_samples),
+            temperature=temperature,
+            number_of_sites=number_of_sites,
         )
 
         print(
             f"T = {temperature:.3f}  "
             f"<|M|> = {magnetisation_means[index]:.4f}  "
-            f"C_v = {specific_heats[index]:.4f}"
+            f"C_v = {specific_heats[index]:.4f}  "
+            f"chi = {susceptibilities[index]:.4f}"
         )
 
-    return temperatures, magnetisation_means, specific_heats
+    return temperatures, magnetisation_means, specific_heats, susceptibilities
 
 
 def main() -> None:
@@ -180,6 +191,7 @@ def main() -> None:
         temperatures,
         magnetisation_means,
         specific_heats,
+        susceptibilities,
     ) = run_temperature_sweep(
         lattice_size=arguments.lattice_size,
         coupling_constant=arguments.coupling_constant,
@@ -200,6 +212,7 @@ def main() -> None:
         temperatures=temperatures,
         magnetisation_means=magnetisation_means,
         specific_heats=specific_heats,
+        susceptibilities=susceptibilities,
         lattice_size=arguments.lattice_size,
         coupling_constant=arguments.coupling_constant,
     )
