@@ -99,6 +99,7 @@ def run_ising2d_simulation(
     burn_in_sweeps: int,
     sampling_interval: int,
     random_seed: int | None,
+    use_staggered_magnetisation: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Run a 2D Ising Monte Carlo simulation and collect samples.
 
@@ -150,10 +151,18 @@ def run_ising2d_simulation(
             (sweep_index - burn_in_sweeps) % sampling_interval == 0
         ):
             energy_samples[sample_index] = ising_model.compute_total_energy()
-            magnetisation_samples[sample_index] = (
-                ising_model.compute_magnetisation()
-            )
+
+            if use_staggered_magnetisation:
+                magnetisation_samples[sample_index] = (
+                    ising_model.compute_staggered_magnetisation()
+                )
+            else:
+                magnetisation_samples[sample_index] = (
+                    ising_model.compute_magnetisation()
+                )
+
             sample_index += 1
+
 
     return energy_samples, magnetisation_samples
 
@@ -170,6 +179,7 @@ def main() -> None:
         burn_in_sweeps=arguments.burn_in_sweeps,
         sampling_interval=arguments.sampling_interval,
         random_seed=arguments.random_seed,
+        use_staggered_magnetisation=False,
     )
 
     output_file = Path(arguments.output_path)

@@ -1,9 +1,8 @@
 """
-ising2d_temperature_sweep.py
+ising2d_afm_temperature_sweep.py
 
-Run a 2D Ising model over a range of temperatures, using the Metropolis
-algorithm, and record magnetisation, specific heat, and susceptibility
-as functions of temperature.
+Temperature sweep for the 2D antiferromagnetic Ising model. Uses a negative
+coupling constant J and the staggered magnetisation as the order parameter.
 """
 
 from __future__ import annotations
@@ -19,16 +18,17 @@ from .observables import compute_specific_heat, compute_susceptibility
 
 
 def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments for the 2D temperature sweep.
+    """Parse command-line arguments for the AFM temperature sweep.
 
     Returns:
         argparse.Namespace: Parsed arguments controlling lattice size,
-        coupling constant, temperature range, and simulation parameters.
+        temperature range, and simulation parameters.
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Run a 2D Ising model over a range of temperatures and compute "
-            "magnetisation, specific heat, and susceptibility."
+            "Run a 2D antiferromagnetic Ising model over a range of "
+            "temperatures and compute staggered magnetisation, specific heat, "
+            "and susceptibility."
         )
     )
     parser.add_argument(
@@ -40,10 +40,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--coupling_constant",
         type=float,
-        default=1.0,
+        default=-1.0,
         help=(
-            "Nearest neighbour coupling constant J (default: 1.0). "
-            "Use a negative value for the antiferromagnetic case."
+            "Nearest neighbour coupling constant J (default: -1.0 for the "
+            "antiferromagnetic case)."
         ),
     )
     parser.add_argument(
@@ -86,21 +86,21 @@ def parse_arguments() -> argparse.Namespace:
         "--random_seed",
         type=int,
         default=None,
-        help="Optional base seed. Different temperatures will use offsets.",
+        help="Optional base seed. Different temperatures use offsets.",
     )
     parser.add_argument(
         "--output_path",
         type=str,
-        default="results/raw/ising2d_temperature_sweep.npz",
+        default="results/raw/ising2d_afm_temperature_sweep.npz",
         help=(
-            "Path to a .npz file where temperature-dependent observables will "
-            "be stored (default: results/raw/ising2d_temperature_sweep.npz)."
+            "Path to a .npz file where AFM temperature-dependent observables "
+            "will be stored (default: results/raw/ising2d_afm_temperature_sweep.npz)."
         ),
     )
     return parser.parse_args()
 
 
-def run_temperature_sweep(
+def run_afm_temperature_sweep(
     lattice_size: int,
     coupling_constant: float,
     temperature_min: float,
@@ -111,11 +111,11 @@ def run_temperature_sweep(
     sampling_interval: int,
     random_seed: int | None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Run a temperature sweep and compute magnetisation, C_v and chi.
+    """Run the AFM sweep and compute staggered magnetisation, C_v and chi.
 
     Args:
         lattice_size (int): Linear lattice size L.
-        coupling_constant (float): Coupling constant J.
+        coupling_constant (float): Negative coupling constant J.
         temperature_min (float): Minimum temperature.
         temperature_max (float): Maximum temperature.
         number_of_temperatures (int): Number of temperature points.
@@ -127,14 +127,16 @@ def run_temperature_sweep(
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
             - Temperatures.
-            - Mean absolute magnetisation per site.
+            - Mean staggered magnetisation per site.
             - Specific heat per site.
-            - Susceptibility per site.
+            - Susceptibility per site based on staggered magnetisation.
     """
     temperatures = np.linspace(
         temperature_min, temperature_max, number_of_temperatures
     )
-    magnetisation_means = np.empty(number_of_temperatures, dtype=float)
+    staggered_magnetisation_means = np.empty(
+        number_of_temperatures, dtype=float
+    )
     specific_heats = np.empty(number_of_temperatures, dtype=float)
     susceptibilities = np.empty(number_of_temperatures, dtype=float)
 
@@ -146,7 +148,7 @@ def run_temperature_sweep(
         else:
             seed_for_this_temperature = random_seed + index
 
-        energy_samples, magnetisation_samples = run_ising2d_simulation(
+        energy_samples, staggered_m_samples = run_ising2d_simulation(
             lattice_size=lattice_size,
             temperature=temperature,
             coupling_constant=coupling_constant,
@@ -154,46 +156,50 @@ def run_temperature_sweep(
             burn_in_sweeps=burn_in_sweeps,
             sampling_interval=sampling_interval,
             random_seed=seed_for_this_temperature,
-            use_staggered_magnetisation=False,
+            use_staggered_magnetisation=True,
         )
 
-        # Mean absolute magnetisation per site
-        magnetisation_means[index] = np.mean(np.abs(magnetisation_samples))
+        staggered_magnetisation_means[index] = np.mean(
+            np.abs(staggered_m_samples)
+        )
 
-        # Specific heat per site
         Cv_total = compute_specific_heat(
             energy_samples=np.array(energy_samples),
             temperature=temperature,
         )
         specific_heats[index] = Cv_total / number_of_sites
 
-        # Susceptibility per site
         susceptibilities[index] = compute_susceptibility(
-            magnetisation_samples=np.array(magnetisation_samples),
+            magnetisation_samples=np.array(staggered_m_samples),
             temperature=temperature,
             number_of_sites=number_of_sites,
         )
 
         print(
             f"T = {temperature:.3f}  "
-            f"<|M|> = {magnetisation_means[index]:.4f}  "
+            f"<|M_s|> = {staggered_magnetisation_means[index]:.4f}  "
             f"C_v = {specific_heats[index]:.4f}  "
-            f"chi = {susceptibilities[index]:.4f}"
+            f"chi_s = {susceptibilities[index]:.4f}"
         )
 
-    return temperatures, magnetisation_means, specific_heats, susceptibilities
+    return (
+        temperatures,
+        staggered_magnetisation_means,
+        specific_heats,
+        susceptibilities,
+    )
 
 
 def main() -> None:
-    """Entry point for the 2D Ising temperature sweep."""
+    """Entry point for the 2D AFM Ising temperature sweep."""
     arguments = parse_arguments()
 
     (
         temperatures,
-        magnetisation_means,
+        staggered_magnetisation_means,
         specific_heats,
         susceptibilities,
-    ) = run_temperature_sweep(
+    ) = run_afm_temperature_sweep(
         lattice_size=arguments.lattice_size,
         coupling_constant=arguments.coupling_constant,
         temperature_min=arguments.temperature_min,
@@ -211,14 +217,14 @@ def main() -> None:
     np.savez(
         output_file,
         temperatures=temperatures,
-        magnetisation_means=magnetisation_means,
+        staggered_magnetisation_means=staggered_magnetisation_means,
         specific_heats=specific_heats,
         susceptibilities=susceptibilities,
         lattice_size=arguments.lattice_size,
         coupling_constant=arguments.coupling_constant,
     )
 
-    print(f"Saved sweep data to {arguments.output_path}")
+    print(f"Saved AFM sweep data to {arguments.output_path}")
 
 
 if __name__ == "__main__":

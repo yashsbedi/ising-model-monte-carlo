@@ -59,3 +59,24 @@ class Ising2DModel:
             float: Mean spin value.
         """
         return float(np.mean(self.spins))
+
+
+    def compute_staggered_magnetisation(self) -> float:
+        """Compute the staggered magnetisation per site.
+
+        The staggered magnetisation is defined as
+
+            m_s = (1 / N) * sum_{i,j} (-1)^{i + j} s_{i,j},
+
+        which is the appropriate order parameter for the antiferromagnetic
+        case, where neighbouring spins prefer to be anti-aligned.
+
+        Returns:
+            float: Staggered magnetisation per site.
+        """
+        lattice_size = self.lattice_size
+        # Create a checkerboard pattern of +1 and -1 factors
+        row_indices, column_indices = np.indices((lattice_size, lattice_size))
+        checkerboard = (-1) ** (row_indices + column_indices)
+        staggered = np.mean(self.spins * checkerboard)
+        return float(staggered)
